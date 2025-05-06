@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>INST377 - Doggos</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/annyang/2.6.1/annyang.min.js"></script>
+  <style>
+    body {
+      background-color: pink;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color:black;
+      padding: 0;
+    }
+    header {
+      background-color: lightskyblue;
+      color: black;
+      padding: 10px;
+      font-size: 24px;
+      text-align: center;
+      font-weight: bold;
+    }
+    nav {
+      background-color: lavender;
+      padding: 8px;
+      text-align: center;
+      color: black;
+    }
+    nav a {
+      color: black;
+      margin: 0 10px;
+      text-decoration: none;
+
+
+    }
+    h2 {
+      text-align: center;
+      margin: 20px 0;
+      color:black;
+    }
+    .carousel-container {
+      position: relative;
+      width: 90%;
+      max-width: 800px;
+      margin: 0 auto 20px auto;
+    }
+    .carousel-container img {
+      width: 100%;
+      height: 400px;
+      object-fit: cover;
+      border-radius: 10px;
+    }
+    .arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 40px;
+      background-color: rgba(0,0,0,0.5);
+      color: white;
+      padding: 10px;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 50%;
+    }
+    .arrow.left {
+      left: 10px;
+    }
+    .arrow.right {
+      right: 10px;
+    }
+    .breeds {
+      text-align: center;
+      margin: 10px auto 20px auto;
+      max-width: 1000px;
+      flex-wrap: wrap;
+    }
+    .breeds button {
+      background-color: lavenderblush;
+      color: black;
+      padding: 10px;
+      margin: 5px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: 2px 2px purple;
+      font-size: 14px;
+    }
+    .breed-info {
+      background-color: white;
+      margin: 20px auto;
+      padding: 20px;
+      max-width: 800px;
+      border-radius: 10px;
+      display: none;
+      border: 3px solid black;
+    }
+    .breed-info h3 {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>INST377 - Doggos</header>
+  <nav>
+    <a href="index assignment 2.html">Home</a>
+    <a href="stocks.html">Stocks</a>
+    <a href="dogs.html">Dogs</a>
+  </nav>
+
+  <h2>Doggos! 🐾</h2>
+
+  <div class="carousel-container">
+    <span class="arrow left" onclick="changeSlide(-1)">&#10094;</span>
+    <img id="dogImage" src="" alt="Dog" />
+    <span class="arrow right" onclick="changeSlide(1)">&#10095;</span>
+  </div>
+
+  <div class="breeds" id="breedButtons"></div>
+
+  <div class="breed-info" id="breedInfo">
+    <h3 id="breedName">Name:</h3>
+    <p id="breedDesc">Description:</p>
+    <p><strong>Min Life:</strong> <span id="breedMinLife"></span></p>
+    <p><strong>Max Life:</strong> <span id="breedMaxLife"></span></p>
+  </div>
+
+  <script>
+    let dogImages = [];
+    let currentIndex = 0;
+
+    async function loadCarousel() {
+      const res = await fetch("https://api.thedogapi.com/v1/images/search?limit=10");
+      dogImages = await res.json();
+      showSlide(0);
+    }
+
+    function showSlide(index) {
+      const img = document.getElementById("dogImage");
+      if (dogImages.length > 0) {
+        img.src = dogImages[index].url;
+      }
+    }
+
+    function changeSlide(n) {
+      currentIndex = (currentIndex + n + dogImages.length) % dogImages.length;
+      showSlide(currentIndex);
+    }
+
+    async function loadBreeds() {
+      const res = await fetch("https://api.thedogapi.com/v1/breeds");
+      const breeds = await res.json();
+      const breedButtons = document.getElementById("breedButtons");
+
+      const selectedNames = ["Japanese Terrier", "Border Collie", "Skye Terrier", "Hokkaido", "Tibetan Spaniel", "Beagle", "Golden Retriever", "Labrador Retriever", "Chow Chow", "Dalmatian"];
+      const selectedBreeds = breeds.filter(b => selectedNames.includes(b.name));
+
+      selectedBreeds.forEach(breed => {
+        const btn = document.createElement("button");
+        btn.innerText = breed.name;
+        btn.addEventListener("click", () => showBreedInfo(breed));
+        breedButtons.appendChild(btn);
+      });
+
+      if (annyang) {
+        const commands = {
+          'show *breed': (breedName) => {
+            const match = selectedBreeds.find(b => b.name.toLowerCase() === breedName.toLowerCase());
+            if (match) showBreedInfo(match);
+          }
+        };
+        annyang.addCommands(commands);
+        annyang.start();
+      }
+    }
+
+    function showBreedInfo(breed) {
+      document.getElementById("breedName").innerText = `Name: ${breed.name}`;
+      document.getElementById("breedDesc").innerText = `Description: ${breed.temperament || "N/A"}`;
+      const lifeParts = breed.life_span.replace(" years", "").split(" - ");
+      document.getElementById("breedMinLife").innerText = lifeParts[0];
+      document.getElementById("breedMaxLife").innerText = lifeParts[1] || "N/A";
+      document.getElementById("breedInfo").style.display = "block";
+    }
+
+    loadCarousel();
+    loadBreeds();
+  </script>
+</body>
+</html>

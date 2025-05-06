@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>INST377 - Stocks</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/annyang/2.6.1/annyang.min.js"></script>
+  <style>
+    body {
+      background-color: pink;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: black;
+    }
+    header {
+      background-color: lightskyblue;
+      color: black;
+      padding: 10px;
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+    }
+    nav {
+      background-color: lavenderblush;
+      padding: 8px;
+      text-align: center;
+      color: black;
+    }
+    nav a {
+      color: black;
+      margin: 0 10px;
+      text-decoration: none;
+
+    }
+    h2 {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .controls {
+      text-align: center;
+      margin: 20px;
+    }
+    .controls select, .controls input {
+      padding: 8px;
+      margin: 5px;
+      font-size: 16px;
+    }
+    .custom-button {
+      background-color: lightskyblue;
+      color: white;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 10px;
+      box-shadow: 2px 2px #0ea5e9;
+    }
+    #chartContainer {
+      display: none;
+      width: 95%;
+      max-width: 900px;
+      margin: 30px auto;
+      background-color: white;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    table {
+      margin: 0 auto;
+      border-collapse: collapse;
+      background: #fff;
+      border: 2px solid black;
+    }
+    table, th, td {
+      border: 2px solid black;
+    }
+    th, td {
+      padding: 10px 20px;
+      text-align: center;
+    }
+    .bullish-icon {
+      width: 50px;
+    }
+    .bearish-icon {
+      width: 50px;
+      opacity: 0.6;
+    }
+    .error {
+      color: red;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>INST377 - Activities</header>
+<nav>
+  <a href="index assignment 2.html">Home</a>
+  <a href="stocks.html">Stocks</a>
+  <a href="dogs.html">Dogs</a>
+</nav>
+
+<h2>Let's chart some stocks!</h2>
+
+<div class="controls">
+  <select id="daysSelect">
+    <option value="30">30 Days</option>
+    <option value="60">60 Days</option>
+    <option value="90">90 Days</option>
+  </select>
+  <input type="text" id="stockInput" placeholder="Enter Ticker (e.g. AAPL)" />
+  <button class="custom-button" id="lookupBtn">Lookup</button>
+</div>
+
+<div id="chartContainer">
+  <canvas id="stockChart"></canvas>
+</div>
+
+<p class="error" id="errorMsg"></p>
+
+<h3 style="text-align:center;">Top 5 Reddit Stocks (2022-04-03)</h3>
+<table>
+  <thead>
+    <tr>
+      <th>TICKER</th>
+      <th>COMMENT COUNT</th>
+      <th>SENTIMENT</th>
+    </tr>
+  </thead>
+  <tbody id="redditTableBody"></tbody>
+</table>
+
+<script>
+  const apiKey = "8n3BV4cS9JaV89Tia6PySO5_WUaTUd7u";
+  const chartCtx = document.getElementById("stockChart").getContext("2d");
+  const errorMsg = document.getElementById("errorMsg");
+  let stockChart;
+
+  const lookupBtn = document.getElementById("lookupBtn");
+  const stockInput = document.getElementById("stockInput");
+  const daysSelect = document.getElementById("daysSelect");
+
+  const tickerMap = {
+    apple: "AAPL",
+    tesla: "TSLA",
+    microsoft: "MSFT",
+    amazon: "AMZN",
+    google: "GOOGL",
+    meta: "META",
+    netflix: "NFLX",
+    nvidia: "NVDA",
+    intel: "INTC"
+  };
+
+  function convertEpoch(epochMillis) {
+    const date = new Date(epochMillis);
+    return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+  }
+
+  async function fetchStock(ticker, days) {
+    errorMsg.innerText = "";
+    document.getElementById("chartContainer").style.display = "block";
+
+    const today = new Date();
+    let endDate = new Date(today);
+    const dayOfWeek = endDate.getUTCDay();
+
+    if (dayOfWeek === 6) endDate.setDate(endDate.getDate() - 1);
+    if (dayOfWeek === 0) endDate.setDate(endDate.getDate() - 2);
+
+    const startDate = new Date(endDate);
+    startDate.setDate(endDate.getDate() - days);
+
+    const to = endDate.toISOString().split("T")[0];
+    const from = startDate.toISOString().split("T")[0];
+
+    const url = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=120&apiKey=${apiKey}`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.results || data.results.length === 0) {
+        errorMsg.innerText = "No price data found for this ticker. Try a valid stock symbol.";
+        return;
+      }
+
+      const labels = data.results.map(d => convertEpoch(d.t));
+      const prices = data.results.map(d => d.c);
+
+      if (stockChart) stockChart.destroy();
+
+      stockChart = new Chart(chartCtx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `${ticker} Stock Price`,
+            data: prices,
+            borderColor: '#2563eb',
+            backgroundColor: '#bfdbfe',
+            tension: 0.3,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+            }
+          }
+        }
+      });
+
+    } catch (err) {
+      errorMsg.innerText = "Error fetching stock data. Please verify your API key.";
+    }
+  }
+
+  lookupBtn.addEventListener("click", () => {
+    const ticker = stockInput.value.toUpperCase();
+    const days = parseInt(daysSelect.value);
+    if (ticker) {
+      fetchStock(ticker, days);
+    }
+  });
+
+  function setupVoiceCommands() {
+    if (annyang) {
+      const commands = {
+        'lookup *stock': (spoken) => {
+          console.log("Heard:", spoken);
+          const spokenClean = spoken.trim().toLowerCase();
+          const mappedTicker = tickerMap[spokenClean] || spokenClean.toUpperCase();
+
+          if (mappedTicker.match(/^[A-Z]{1,5}$/)) {
+            stockInput.value = mappedTicker;
+            daysSelect.value = '30';
+            fetchStock(mappedTicker, 30);
+            const msg = new SpeechSynthesisUtterance(`Looking up ${mappedTicker}`);
+            window.speechSynthesis.speak(msg);
+          } else {
+            errorMsg.innerText = "Unrecognized stock name. Please try again.";
+          }
+        }
+      };
+
+      annyang.removeCommands();
+      annyang.addCommands(commands);
+
+      annyang.addCallback('error', function (err) {
+        console.error("Speech recognition error:", err);
+        errorMsg.innerText = "Speech recognition error occurred.";
+      });
+
+      annyang.addCallback('soundstart', function () {
+        console.log("🎤 Listening...");
+      });
+    }
+  }
+
+  window.onload = function () {
+    const tableBody = document.getElementById("redditTableBody");
+    const redditURL = "https://tradestie.com/api/v1/apps/reddit?date=2022-04-03";
+
+    fetch(redditURL)
+      .then(response => response.json())
+      .then(data => {
+        const top5 = data.slice(0, 5);
+        top5.forEach(item => {
+          const row = document.createElement("tr");
+
+          const linkCell = document.createElement("td");
+          const link = document.createElement("a");
+          link.href = `https://finance.yahoo.com/quote/${item.ticker}`;
+          link.target = "_blank";
+          link.innerText = item.ticker;
+          linkCell.appendChild(link);
+
+          const countCell = document.createElement("td");
+          countCell.innerText = item.no_of_comments;
+
+          const sentimentCell = document.createElement("td");
+          const img = document.createElement("img");
+          img.src = item.sentiment === "Bullish"
+            ? "https://cdn-icons-png.flaticon.com/512/616/616408.png"
+            : "https://cdn-icons-png.flaticon.com/512/616/616554.png";
+          img.alt = item.sentiment;
+          img.className = item.sentiment === "Bullish" ? "bullish-icon" : "bearish-icon";
+          sentimentCell.appendChild(img);
+
+          row.appendChild(linkCell);
+          row.appendChild(countCell);
+          row.appendChild(sentimentCell);
+          tableBody.appendChild(row);
+        });
+      })
+      .catch(err => {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 3;
+        cell.innerText = "Unable to load Reddit stock data.";
+        row.appendChild(cell);
+        tableBody.appendChild(row);
+        console.error("Reddit fetch error:", err);
+      });
+
+    // Enable voice commands immediately
+    if (annyang) {
+      setupVoiceCommands();
+      annyang.start({ autoRestart: true, continuous: true });
+      const msg = new SpeechSynthesisUtterance("Voice lookup is now active. Say lookup followed by a stock name.");
+      window.speechSynthesis.speak(msg);
+    } else {
+      errorMsg.innerText = "Voice recognition is not supported in this browser.";
+    }
+  };
+</script>
+
+</body>
+</html>
